@@ -1,13 +1,17 @@
 package com.yourname.zerog;
 
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 
 public class PlayerState {
-    // 翻滚角度
-    public float roll = 0.0F;
+    // 用四元数统一存储玩家的完整朝向 (yaw + pitch + roll)
+    // 避免 Euler 角拼接导致的 gimbal lock 和旋转顺序错误
+    public Quaternionf orientation = new Quaternionf(); // identity = 面朝南(+Z), 头朝上(+Y)
 
-    // 改回 Vec3，只要文件最上面写了 import 就不会报错
     public Vec3 velocity = Vec3.ZERO;
 
     public boolean isZeroGEnabled = true;
+
+    // 标记朝向是否已从玩家的 yaw/pitch 初始化过
+    public boolean orientationInitialized = false;
 }

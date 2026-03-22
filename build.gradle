@@ -2,11 +2,12 @@ plugins {
     id 'eclipse'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '5.1.+'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 version = '1.0.0'
-group = 'com.yourname.spaceflight'
-archivesBaseName = 'spaceflight'
+group = 'com.yourname.zerog'
+archivesBaseName = 'zerog'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -18,9 +19,10 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
-            property 'forge.enabledGameTestNamespaces', 'spaceflight'
+            property 'forge.enabledGameTestNamespaces', 'zerog'
+            arg "-mixin.config=zerog.mixins.json"
             mods {
-                spaceflight {
+                zerog {
                     source sourceSets.main
                 }
             }
@@ -29,9 +31,9 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
-            property 'forge.enabledGameTestNamespaces', 'spaceflight'
+            property 'forge.enabledGameTestNamespaces', 'zerog'
             mods {
-                spaceflight {
+                zerog {
                     source sourceSets.main
                 }
             }
@@ -39,7 +41,11 @@ minecraft {
     }
 }
 
-// 这是唯一修复的部分，解决 mods.toml 版本替换问题
+mixin {
+    add sourceSets.main, "zerog.refmap.json"
+    config "zerog.mixins.json"
+}
+
 processResources {
     inputs.property "version", project.version
     filesMatching("META-INF/mods.toml") {
@@ -49,6 +55,7 @@ processResources {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.18'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 tasks.withType(JavaCompile).configureEach {
