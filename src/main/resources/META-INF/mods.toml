@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[47,48)"
+license="MIT"
+
+[[mods]]
+modId="zerog"
+version="1.0.0"
+displayName="Zero G Mod"
+authors="Your Name"
+description='''
+真正的6DoF无重力模组！
+像《边境》一样在太空中自由翻滚。
+'''
+
+[[dependencies.zerog]]
+modId="forge"
+mandatory=true
+versionRange="[47,48)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.zerog]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
