@@ -1,1 +1,20 @@
+name: 打包 Java Mod
+on: [push, pull_request]  # 推送代码或合并PR时自动打包
 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 设置 JDK 环境
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'  # 根据你的Mod需求选择，如17、21
+          distribution: 'temurin'
+      - name: 构建 Mod
+        run: ./gradlew jar  # 执行构建命令，Fabric/Forge 项目通用
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 我的Mod文件
+          path: build/libs/  # 上传构建输出的jar包
