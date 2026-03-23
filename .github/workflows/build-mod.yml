@@ -1,20 +1,38 @@
-name: 打包 Java Mod
-on: [push, pull_request]  # 推送代码或合并PR时自动打包
+name: 打包 Minecraft Forge 1.20.1 模组
+# 仅在推送到 main 分支或打标签时触发，避免无效构建
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: 设置 JDK 环境
+      # 1. 拉取代码
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      # 2. 配置 JDK 17（Forge 1.20.1 强制要求）
+      - name: 设置 JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'  # 根据你的Mod需求选择，如17、21
+          java-version: '17'
           distribution: 'temurin'
-      - name: 构建 Mod
-        run: ./gradlew jar  # 执行构建命令，Fabric/Forge 项目通用
-      - name: 上传构建产物
+
+      # 3. 授予 Gradle 执行权限（Linux 环境必须）
+      - name: 授予 Gradle 执行权限
+        run: chmod +x ./gradlew
+
+      # 4. 执行构建（Forge 标准构建命令）
+      - name: 构建模组
+        run: ./gradlew build --no-daemon
+
+      # 5. 上传构建产物（过滤测试文件，只保留最终jar）
+      - name: 上传模组文件
         uses: actions/upload-artifact@v4
         with:
-          name: 我的Mod文件
-          path: build/libs/  # 上传构建输出的jar包
+          name: 6DoF-Mod-Forge-1.20.1
+          path: build/libs/*.jar
+          # 排除测试用jar
+          pattern: '!*-sources.jar, !*-dev.jar, !*-javadoc.jar'
