@@ -1,11 +1,12 @@
 {
   "required": true,
-  "minVersion": "0.8",
   "package": "com.yourname.zerog.mixin",
   "compatibilityLevel": "JAVA_17",
-  "refmap": "zerog.refmap.json",
+  "minVersion": "0.8",
   "client": [
-    "CameraMixin"
+    "CameraMixin",
+    "PlayerDimensionsMixin",
+    "PlayerPositionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

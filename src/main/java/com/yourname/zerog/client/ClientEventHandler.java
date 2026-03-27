@@ -4,109 +4,310 @@ import com.yourname.zerog.ModKeyBindings;
 import com.yourname.zerog.PlayerState;
 import com.yourname.zerog.ZeroGMod;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderPlayerEvent;
+import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID, value = Dist.CLIENT)
 public class ClientEventHandler {
 
-    // 上一帧的鼠标 yaw/pitch，用于计算增量
-    private static float prevYaw = Float.NaN;
-    private static float prevPitch = Float.NaN;
+    private static double lastMouseX = Double.NaN;
+    private static double lastMouseY = Double.NaN;
+
+    // ==================== 角度提取工具 ====================
+
+    private static float extractYaw(Quaternionf q) {
+        float yaw = (float) Math.atan2(
+                2.0f * (q.w * q.y + q.x * q.z),
+                1.0f - 2.0f * (q.y * q.y + q.x * q.x)
+        );
+        return (float) Math.toDegrees(-yaw);
+    }
+
+    private static float extractPitch(Quaternionf q) {
+        float sinp = 2.0f * (q.w * q.x - q.z * q.y);
+        sinp = clamp(sinp, -1.0f, 1.0f);
+        return (float) Math.toDegrees((float) Math.asin(sinp));
+    }
+
+    private static float extractRoll(Quaternionf q) {
+        float roll = (float) Math.atan2(
+                2.0f * (q.w * q.z + q.x * q.y),
+                1.0f - 2.0f * (q.x * q.x + q.z * q.z)
+        );
+        return (float) Math.toDegrees(roll);
+    }
+
+    private static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    // ==================== RCS 粒子系统 ====================
+
+    /**
+     * 在玩家身体的局部坐标位置生成 RCS 喷气粒子
+     * @param player 玩家
+     * @param localOffset 局部坐标偏移（相对于玩家中心）
+     * @param localJetDir 局部喷射方向（粒子飞行方向）
+     * @param orientation 当前四元数朝向
+     */
+    private static void spawnRCSParticle(LocalPlayer player, Vector3f localOffset, Vector3f localJetDir, Quaternionf orientation) {
+        if (player.level() == null) return;
+
+        // 将局部坐标转换为世界坐标
+        Vector3f worldOffset = new Vector3f(localOffset);
+        orientation.transform(worldOffset);
+
+        Vector3f worldJetDir = new Vector3f(localJetDir);
+        orientation.transform(worldJetDir);
+
+        double px = player.getX() + worldOffset.x;
+        double py = player.getY() + player.getBbHeight() / 2.0 + worldOffset.y;
+        double pz = player.getZ() + worldOffset.z;
+
+        // 粒子速度（喷射方向 × 速度系数）
+        float speed = 0.15f;
+        double vx = worldJetDir.x * speed;
+        double vy = worldJetDir.y * speed;
+        double vz = worldJetDir.z * speed;
+
+        // 添加少量随机扰动让粒子更自然
+        vx += (Math.random() - 0.5) * 0.02;
+        vy += (Math.random() - 0.5) * 0.02;
+        vz += (Math.random() - 0.5) * 0.02;
+
+        player.level().addParticle(ParticleTypes.CLOUD, px, py, pz, vx, vy, vz);
+    }
+
+    /**
+     * 每帧根据按键状态生成对应的 RCS 喷气粒子
+     */
+    private static void handleRCSParticles(LocalPlayer player, Quaternionf orientation) {
+        Minecraft mc = Minecraft.getInstance();
+
+        // 身体各位置的局部坐标偏移
+        float back = 0.3f;    // 背部
+        float front = -0.3f;  // 胸前
+        float side = 0.35f;   // 肩宽
+        float top = 0.9f;     // 头顶距中心
+        float bottom = -0.9f; // 脚底距中心
+
+        // 每个按键每 tick 生成 2 个粒子（视觉密度）
+        int particleCount = 2;
+
+        // W = 前进 → 背部向后喷
+        if (mc.options.keyUp.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(randSpread(0.1f), randSpread(0.1f), back),
+                        new Vector3f(0, 0, 1),  // 局部Z+ = 向后喷
+                        orientation);
+            }
+        }
+
+        // S = 后退 → 胸前向前喷
+        if (mc.options.keyDown.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(randSpread(0.1f), randSpread(0.1f), front),
+                        new Vector3f(0, 0, -1), // 局部Z- = 向前喷
+                        orientation);
+            }
+        }
+
+        // A = 左移 → 右肩向右喷
+        if (mc.options.keyLeft.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(-side, randSpread(0.1f), randSpread(0.1f)),
+                        new Vector3f(-1, 0, 0), // 局部X- = 向右喷（反作用力推左）
+                        orientation);
+            }
+        }
+
+        // D = 右移 → 左肩向左喷
+        if (mc.options.keyRight.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(side, randSpread(0.1f), randSpread(0.1f)),
+                        new Vector3f(1, 0, 0),  // 局部X+ = 向左喷（反作用力推右）
+                        orientation);
+            }
+        }
+
+        // Space = 上升 → 脚底向下喷
+        if (mc.options.keyJump.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(randSpread(0.15f), bottom, randSpread(0.15f)),
+                        new Vector3f(0, -1, 0), // 局部Y- = 向下喷
+                        orientation);
+            }
+        }
+
+        // Shift = 下降 → 头顶向上喷
+        if (mc.options.keyShift.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                spawnRCSParticle(player,
+                        new Vector3f(randSpread(0.15f), top, randSpread(0.15f)),
+                        new Vector3f(0, 1, 0),  // 局部Y+ = 向上喷
+                        orientation);
+            }
+        }
+
+        // Roll Left → 右肩上方+左肩下方 对称喷射
+        if (ModKeyBindings.ROLL_LEFT.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                // 右肩上方向上喷
+                spawnRCSParticle(player,
+                        new Vector3f(-side, 0.3f, randSpread(0.1f)),
+                        new Vector3f(0, 1, 0),
+                        orientation);
+                // 左肩下方向下喷
+                spawnRCSParticle(player,
+                        new Vector3f(side, -0.3f, randSpread(0.1f)),
+                        new Vector3f(0, -1, 0),
+                        orientation);
+            }
+        }
+
+        // Roll Right → 左肩上方+右肩下方 对称喷射
+        if (ModKeyBindings.ROLL_RIGHT.isDown()) {
+            for (int i = 0; i < particleCount; i++) {
+                // 左肩上方向上喷
+                spawnRCSParticle(player,
+                        new Vector3f(side, 0.3f, randSpread(0.1f)),
+                        new Vector3f(0, 1, 0),
+                        orientation);
+                // 右肩下方向下喷
+                spawnRCSParticle(player,
+                        new Vector3f(-side, -0.3f, randSpread(0.1f)),
+                        new Vector3f(0, -1, 0),
+                        orientation);
+            }
+        }
+    }
+
+    /**
+     * 生成 [-spread, +spread] 的随机偏移，让粒子位置更自然
+     */
+    private static float randSpread(float spread) {
+        return (float) (Math.random() - 0.5) * 2.0f * spread;
+    }
+
+    // ==================== 主Tick ====================
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.options == null) return;
 
-        Player player = mc.player;
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
+        if (player == null) return;
+
         PlayerState state = ZeroGMod.CLIENT_STATE;
 
         if (!state.isZeroGEnabled) {
             player.setNoGravity(false);
             state.orientationInitialized = false;
-            prevYaw = Float.NaN;
-            prevPitch = Float.NaN;
+            lastMouseX = Double.NaN;
+            lastMouseY = Double.NaN;
             return;
         }
 
-        // --- 0. 首次初始化：从玩家当前 yaw/pitch 构建四元数 ---
+        player.setNoGravity(true);
+
+        // ===== 初始化四元数（仅首次） =====
         if (!state.orientationInitialized) {
             float yaw = player.getYRot();
             float pitch = player.getXRot();
             state.orientation = new Quaternionf();
-            state.orientation.rotationYXZ(
-                    (float) Math.toRadians(-yaw),
-                    (float) Math.toRadians(pitch),
-                    0f
-            );
-            prevYaw = yaw;
-            prevPitch = pitch;
+            state.orientation.rotateY((float) Math.toRadians(-yaw));
+            state.orientation.rotateX((float) Math.toRadians(pitch));
             state.orientationInitialized = true;
+            lastMouseX = Double.NaN;
+            lastMouseY = Double.NaN;
         }
 
-        // --- 1. 计算鼠标增量 ---
-        float curYaw = player.getYRot();
-        float curPitch = player.getXRot();
+        // ===== 鼠标增量 =====
+        MouseHandler mouse = mc.mouseHandler;
+        double mouseX = mouse.xpos();
+        double mouseY = mouse.ypos();
 
-        float deltaYaw = 0f;
-        float deltaPitch = 0f;
-        if (!Float.isNaN(prevYaw)) {
-            deltaYaw = curYaw - prevYaw;
-            deltaPitch = curPitch - prevPitch;
+        double rawDeltaX = 0.0, rawDeltaY = 0.0;
+        if (!Double.isNaN(lastMouseX)) {
+            rawDeltaX = mouseX - lastMouseX;
+            rawDeltaY = mouseY - lastMouseY;
         }
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
 
-        // 重置 player 的 yaw/pitch 到安全中间值
-        // 防止 Minecraft 的 pitch clamp (-90~90) 在下一帧吃掉输入
-        // 同时保持 yRot == yRotO 避免渲染插值产生抖动
-        player.setXRot(0f);
-        player.xRotO = 0f;
-        player.setYRot(0f);
-        player.yRotO = 0f;
-        // 同步 body/head yaw，防止原版身体转动逻辑干扰
-        player.yBodyRot = 0f;
-        player.yBodyRotO = 0f;
-        player.yHeadRot = 0f;
-        player.yHeadRotO = 0f;
-        prevYaw = 0f;
-        prevPitch = 0f;
+        double sensitivity = mc.options.sensitivity().get();
+        double sensMultiplier = sensitivity * 0.6;
 
-        // --- 2. 将鼠标增量作为局部旋转应用到四元数上 ---
-        float yawRad = (float) Math.toRadians(-deltaYaw);
-        float pitchRad = (float) Math.toRadians(deltaPitch);
+        double deltaX = rawDeltaX * sensMultiplier;
+        double deltaY = rawDeltaY * sensMultiplier;
 
-        if (Math.abs(yawRad) > 0.0001f || Math.abs(pitchRad) > 0.0001f) {
-            Quaternionf deltaRot = new Quaternionf();
-            deltaRot.rotateY(yawRad);
-            deltaRot.rotateX(pitchRad);
-            state.orientation.mul(deltaRot);
+        // ===== Yaw：绕世界Y轴（左乘） =====
+        float yawRad = (float) Math.toRadians(-deltaX);
+        // ===== Pitch：鼠标下移=低头 =====
+        float pitchRad = (float) Math.toRadians(deltaY);
+
+        float maxDelta = (float) Math.toRadians(30.0f);
+        yawRad = clamp(yawRad, -maxDelta, maxDelta);
+        pitchRad = clamp(pitchRad, -maxDelta, maxDelta);
+
+        if (Math.abs(yawRad) > 1e-5f || Math.abs(pitchRad) > 1e-5f) {
+            Quaternionf yawRotation = new Quaternionf().rotateY(yawRad);
+            state.orientation.premul(yawRotation);
+
+            Quaternionf pitchRotation = new Quaternionf().rotateX(pitchRad);
+            state.orientation.mul(pitchRotation);
+
             state.orientation.normalize();
         }
 
-        // --- 3. 处理 Q/E Roll ---
-        float rollSpeed = (float) Math.toRadians(3.0);
+        // ===== Roll：绕模型局部Z轴（右乘 = 模型坐标系） =====
+        float rollSpeed = 0.05f;
         if (ModKeyBindings.ROLL_LEFT.isDown()) {
-            state.orientation.mul(new Quaternionf().rotateZ(rollSpeed));
-            state.orientation.normalize();
-        }
-        if (ModKeyBindings.ROLL_RIGHT.isDown()) {
             state.orientation.mul(new Quaternionf().rotateZ(-rollSpeed));
             state.orientation.normalize();
         }
+        if (ModKeyBindings.ROLL_RIGHT.isDown()) {
+            state.orientation.mul(new Quaternionf().rotateZ(rollSpeed));
+            state.orientation.normalize();
+        }
 
-        // --- 4. 从四元数提取局部坐标轴 ---
+        // ===== 回写角度 =====
+        float extractedYaw = extractYaw(state.orientation);
+        float extractedPitch = extractPitch(state.orientation);
+
+        player.setYRot(extractedYaw);
+        player.yRotO = extractedYaw;
+        player.yBodyRot = extractedYaw;
+        player.yBodyRotO = extractedYaw;
+        player.yHeadRot = extractedYaw;
+        player.yHeadRotO = extractedYaw;
+        player.setXRot(extractedPitch);
+        player.xRotO = extractedPitch;
+
+        // ===== 方向向量 =====
         Vector3f forward3f = new Vector3f(0, 0, 1);
         Vector3f up3f = new Vector3f(0, 1, 0);
         Vector3f right3f = new Vector3f(1, 0, 0);
-
         state.orientation.transform(forward3f);
         state.orientation.transform(up3f);
         state.orientation.transform(right3f);
@@ -115,41 +316,59 @@ public class ClientEventHandler {
         Vec3 upVec = new Vec3(up3f.x, up3f.y, up3f.z);
         Vec3 rightVec = new Vec3(right3f.x, right3f.y, right3f.z);
 
-        // --- 5. WASD 输入 → 基于局部坐标轴移动 ---
-        Vec3 movement = Vec3.ZERO;
-        if (mc.options.keyUp.isDown())    movement = movement.add(forwardVec);
-        if (mc.options.keyDown.isDown())   movement = movement.add(forwardVec.reverse());
-        if (mc.options.keyLeft.isDown())   movement = movement.add(rightVec.reverse());
-        if (mc.options.keyRight.isDown())  movement = movement.add(rightVec);
-        if (mc.options.keyJump.isDown())   movement = movement.add(upVec);
-        if (mc.options.keyShift.isDown())  movement = movement.add(upVec.reverse());
-
-        applyPhysics(player, state, movement);
-    }
-
-    private static void applyPhysics(Player player, PlayerState state, Vec3 input) {
-        player.setNoGravity(true);
+        // ===== 零重力移动 =====
         double accel = 0.02;
         double drag = 0.98;
         double maxSpeed = 1.2;
 
-        if (input.length() > 0.01) {
-            state.velocity = state.velocity.add(input.normalize().scale(accel));
+        if (mc.options.keyUp.isDown()) {
+            state.velocity = state.velocity.add(forwardVec.scale(accel));
         }
+        if (mc.options.keyDown.isDown()) {
+            state.velocity = state.velocity.add(forwardVec.scale(-accel));
+        }
+        if (mc.options.keyLeft.isDown()) {
+            state.velocity = state.velocity.add(rightVec.scale(accel));
+        }
+        if (mc.options.keyRight.isDown()) {
+            state.velocity = state.velocity.add(rightVec.scale(-accel));
+        }
+        if (mc.options.keyJump.isDown()) {
+            state.velocity = state.velocity.add(upVec.scale(accel));
+        }
+        if (mc.options.keyShift.isDown()) {
+            state.velocity = state.velocity.add(upVec.scale(-accel));
+        }
+
         state.velocity = state.velocity.scale(drag);
         if (state.velocity.length() > maxSpeed) {
             state.velocity = state.velocity.normalize().scale(maxSpeed);
         }
+        if (state.velocity.length() < 0.001) {
+            state.velocity = Vec3.ZERO;
+        }
 
-        // 使用 setDeltaMovement 让 Minecraft 的碰撞系统处理移动
-        // 而不是 setPos 直接传送（那样会穿墙）
         player.setDeltaMovement(state.velocity);
+        player.refreshDimensions();
 
-        // 同步速度：如果被墙挡住了，从实际移动结果更新速度
-        // 这会在下一帧通过 getDeltaMovement 自然反映
+        // ===== RCS 喷气粒子（纯装饰） =====
+        handleRCSParticles(player, state.orientation);
     }
 
-    // --- 模型渲染 ---
+    // ==================== 相机 ====================
+
+    @SubscribeEvent
+    public static void onCameraSetup(ViewportEvent.ComputeCameraAngles event) {
+        PlayerState state = ZeroGMod.CLIENT_STATE;
+        if (!state.isZeroGEnabled) return;
+
+        event.setYaw(extractYaw(state.orientation));
+        event.setPitch(extractPitch(state.orientation));
+        event.setRoll(extractRoll(state.orientation));
+    }
+
+    // ==================== 模型渲染 ====================
+
     @SubscribeEvent
     public static void onPlayerRender(RenderPlayerEvent.Pre event) {
         PlayerState state = ZeroGMod.CLIENT_STATE;
@@ -157,15 +376,23 @@ public class ClientEventHandler {
 
         Minecraft mc = Minecraft.getInstance();
         Player entity = event.getEntity();
-
-        // 只处理本地玩家的模型（多人游戏下其他玩家不用我们的 CLIENT_STATE）
         if (entity != mc.player) return;
-
-        // 第一人称不转模型，交给相机处理
         if (mc.options.getCameraType().isFirstPerson()) return;
 
-        // body yaw 已在 tick 中重置为 0，所以这里不需要 undo
-        // 直接应用完整的四元数朝向
-        event.getPoseStack().mulPose(new Quaternionf(state.orientation));
+        PoseStack poseStack = event.getPoseStack();
+        float partialTick = event.getPartialTick();
+        float halfHeight = entity.getBbHeight() / 2.0f;
+
+        float interpolatedBodyYaw = Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot);
+
+        poseStack.translate(0, halfHeight, 0);
+
+        // 1. 施加完整四元数
+        poseStack.mulPose(new Quaternionf(state.orientation));
+
+        // 2. 只抵消原版的bodyYaw（保留180°翻转）
+        poseStack.mulPose(Axis.YP.rotationDegrees(interpolatedBodyYaw));
+
+        poseStack.translate(0, -halfHeight, 0);
     }
 }

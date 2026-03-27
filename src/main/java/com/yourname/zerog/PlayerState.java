@@ -2,16 +2,63 @@ package com.yourname.zerog;
 
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 public class PlayerState {
-    // 用四元数统一存储玩家的完整朝向 (yaw + pitch + roll)
-    // 避免 Euler 角拼接导致的 gimbal lock 和旋转顺序错误
-    public Quaternionf orientation = new Quaternionf(); // identity = 面朝南(+Z), 头朝上(+Y)
 
+    /**
+     * 玩家当前朝向的四元数表示（管理 yaw + pitch + roll 全部）
+     */
+    public Quaternionf orientation = new Quaternionf();
+
+    /**
+     * 零重力模式下的速度
+     */
     public Vec3 velocity = Vec3.ZERO;
 
-    public boolean isZeroGEnabled = true;
+    /**
+     * 是否启用零重力模式
+     */
+    public boolean isZeroGEnabled = false;
 
-    // 标记朝向是否已从玩家的 yaw/pitch 初始化过
+    /**
+     * 四元数是否已从玩家当前朝向初始化
+     */
     public boolean orientationInitialized = false;
+
+    /**
+     * 获取旋转后的上方向向量（世界坐标系）
+     */
+    public Vector3f getRotatedUp() {
+        Vector3f up = new Vector3f(0, 1, 0);
+        orientation.transform(up);
+        return up;
+    }
+
+    /**
+     * 获取旋转后的前方向向量（世界坐标系）
+     */
+    public Vector3f getRotatedForward() {
+        Vector3f forward = new Vector3f(0, 0, 1);
+        orientation.transform(forward);
+        return forward;
+    }
+
+    /**
+     * 获取旋转后的右方向向量（世界坐标系）
+     */
+    public Vector3f getRotatedRight() {
+        Vector3f right = new Vector3f(1, 0, 0);
+        orientation.transform(right);
+        return right;
+    }
+
+    /**
+     * 重置为默认状态
+     */
+    public void reset() {
+        orientation = new Quaternionf();
+        velocity = Vec3.ZERO;
+        orientationInitialized = false;
+    }
 }
