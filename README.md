@@ -12,11 +12,3 @@ to bugs.
 If you come across my code, please help me correct it. Maybe you can also offer some suggestions. I will consider them as appropriate.
 
 如果你看到我的代码，请帮我指正，或许你也可以提出一点建议，我都会适量采纳
-
-The current structure is very rudimentary and it doesn't even have a name yet. Please excuse us.
-
-目前结构很简陋，名字甚至都没起，见谅
-
-The source code path is src/main/java/com/yourname/zerog
-
-源码路径为 src/main/java/com/yourname/zerog
