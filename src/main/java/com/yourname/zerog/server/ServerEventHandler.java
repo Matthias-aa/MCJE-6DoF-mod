@@ -1,8 +1,6 @@
 package com.yourname.zerog.server;
 
 import com.yourname.zerog.capability.ZeroGCapability;
-import com.yourname.zerog.capability.ZeroGState;
-import com.yourname.zerog.ModKeyBindings;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
@@ -14,7 +12,6 @@ import com.yourname.zerog.ZeroGMod;
 
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID)
 public class ServerEventHandler {
-
     private static final float ROLL_SPEED = 0.05f;
     private static final double ACCEL = 0.02, DRAG = 0.98, MAX_SPEED = 1.2;
 
@@ -26,8 +23,8 @@ public class ServerEventHandler {
                 if (!state.isZeroGEnabled) return;
 
                 if (!state.orientationInitialized) {
-                    float yaw = player.m_6084_();
-                    float pitch = player.m_6093_();
+                    float yaw = player.getYRot();
+                    float pitch = player.getXRot();
                     state.orientation = new Quaternionf();
                     state.orientation.rotateY((float) Math.toRadians(-yaw));
                     state.orientation.rotateX((float) Math.toRadians(pitch));
@@ -42,12 +39,12 @@ public class ServerEventHandler {
 
                 float extractedYaw = extractYaw(state.orientation);
                 float extractedPitch = extractPitch(state.orientation);
-                player.m_6842_(extractedYaw);
-                player.m_6841_(extractedPitch);
-                player.field_6300 = extractedYaw;
-                player.field_6302 = extractedYaw;
-                player.m_6852_(extractedYaw);
-                player.m_6848_(extractedYaw);
+                player.setYRot(extractedYaw);
+                player.setXRot(extractedPitch);
+                player.yBodyRot = extractedYaw;
+                player.yHeadRot = extractedYaw;
+                player.setYBodyRot(extractedYaw);
+                player.setYHeadRot(extractedYaw);
 
                 Vector3f f3 = new Vector3f(0, 0, 1),
                         u3 = new Vector3f(0, 1, 0),
@@ -55,23 +52,23 @@ public class ServerEventHandler {
                 state.orientation.transform(f3);
                 state.orientation.transform(u3);
                 state.orientation.transform(r3);
-                Vec3 forward = new Vec3(f3.x, f3.y, f3.z).m_82541_();
-                Vec3 up = new Vec3(u3.x, u3.y, u3.z).m_82541_();
-                Vec3 right = new Vec3(r3.x, r3.y, r3.z).m_82541_();
+                Vec3 forward = new Vec3(f3.x, f3.y, f3.z).normalize();
+                Vec3 up = new Vec3(u3.x, u3.y, u3.z).normalize();
+                Vec3 right = new Vec3(r3.x, r3.y, r3.z).normalize();
 
-                Vec3 acc = Vec3.field_8220;
-                acc = acc.add(forward.m_82490_(state.inputForward * ACCEL));
-                acc = acc.add(right.m_82490_(state.inputStrafe * ACCEL));
-                acc = acc.add(up.m_82490_(state.inputUp * ACCEL));
+                Vec3 acc = Vec3.ZERO;
+                acc = acc.add(forward.scale(state.inputForward * ACCEL));
+                acc = acc.add(right.scale(state.inputStrafe * ACCEL));
+                acc = acc.add(up.scale(state.inputUp * ACCEL));
                 state.velocity = state.velocity.add(acc);
-                state.velocity = state.velocity.m_82490_(DRAG);
-                if (state.velocity.m_82553_() > MAX_SPEED)
-                    state.velocity = state.velocity.m_82541_().m_82490_(MAX_SPEED);
-                if (state.velocity.m_82553_() < 0.001) state.velocity = Vec3.field_8220;
+                state.velocity = state.velocity.scale(DRAG);
+                if (state.velocity.length() > MAX_SPEED)
+                    state.velocity = state.velocity.normalize().scale(MAX_SPEED);
+                if (state.velocity.length() < 0.001) state.velocity = Vec3.ZERO;
 
-                player.m_20256_(state.velocity);
-                player.m_20242_(true);
-                player.field_6269 = true;
+                player.setDeltaMovement(state.velocity);
+                player.setNoGravity(true);
+                player.hurtMarked = true;
             });
         }
     }
