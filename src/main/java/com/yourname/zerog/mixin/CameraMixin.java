@@ -8,12 +8,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(Camera.class)
+@Mixin({Camera.class})
+/* loaded from: zerog-1.0.0.jar:com/yourname/zerog/mixin/CameraMixin.class */
 public abstract class CameraMixin {
-
-    @Inject(method = "setup", at = @At("TAIL"))
-    private void zerog$onSetup(BlockGetter level, Entity entity, boolean detached,
-                               boolean mirrored, float partialTick, CallbackInfo ci) {
-        // 留空 — roll/yaw/pitch 由 ClientEventHandler.onCameraSetup() 处理
+    @Inject(method = {"setup"}, at = {@At("TAIL")})
+    private void zerog$onSetup(BlockGetter level, Entity entity, boolean detached, boolean mirrored, float partialTick, CallbackInfo ci) {
     }
 }
