@@ -53,64 +53,59 @@ public class ClientEventHandler {
     }
 
     private static void spawnRCSParticle(LocalPlayer player, Vector3f localOffset, Vector3f localJetDir, Quaternionf orientation) {
-        if (player.m_9236_() == null) {
-            return;
-        }
+        if (player.level() == null) return;
         Vector3f worldOffset = new Vector3f(localOffset);
         orientation.transform(worldOffset);
         Vector3f worldJetDir = new Vector3f(localJetDir);
         orientation.transform(worldJetDir);
-        double px = player.m_20185_() + worldOffset.x;
-        double py = player.m_20186_() + (player.m_20206_() / 2.0d) + worldOffset.y;
-        double pz = player.m_20189_() + worldOffset.z;
+        double px = player.getX() + worldOffset.x;
+        double py = player.getY() + (player.getBbHeight() / 2.0d) + worldOffset.y;
+        double pz = player.getZ() + worldOffset.z;
         double vx = worldJetDir.x * 0.15f;
         double vy = worldJetDir.y * 0.15f;
         double vz = worldJetDir.z * 0.15f;
-        player.m_9236_().m_7106_(ParticleTypes.f_123796_, px, py, pz, vx + ((Math.random() - 0.5d) * 0.02d), vy + ((Math.random() - 0.5d) * 0.02d), vz + ((Math.random() - 0.5d) * 0.02d));
+        player.level().addParticle(ParticleTypes.DRAGON_BREATH, px, py, pz,
+                vx + ((Math.random() - 0.5d) * 0.02d),
+                vy + ((Math.random() - 0.5d) * 0.02d),
+                vz + ((Math.random() - 0.5d) * 0.02d));
     }
 
     private static void handleRCSParticles(LocalPlayer player, Quaternionf orientation) {
-        Minecraft mc = Minecraft.m_91087_();
-        if (mc.f_91066_.f_92085_.m_90857_()) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player.input.up.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), 0.3f), new Vector3f(0, 0, 1), orientation);
+        }
+        if (mc.player.input.down.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), -0.3f), new Vector3f(0, 0, -1), orientation);
+        }
+        if (mc.player.input.left.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(-0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(-1, 0, 0), orientation);
+        }
+        if (mc.player.input.right.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(1, 0, 0), orientation);
+        }
+        if (mc.player.input.jump.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(randSpread(0.15f), -0.9f, randSpread(0.15f)), new Vector3f(0, -1, 0), orientation);
+        }
+        if (mc.player.input.shift.isDown()) {
+            for (int i = 0; i < 2; i++)
+                spawnRCSParticle(player, new Vector3f(randSpread(0.15f), 0.9f, randSpread(0.15f)), new Vector3f(0, 1, 0), orientation);
+        }
+        if (ModKeyBindings.ROLL_LEFT.isDown()) {
             for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), 0.3f), new Vector3f(0.0f, 0.0f, 1.0f), orientation);
+                spawnRCSParticle(player, new Vector3f(-0.35f, 0.3f, randSpread(0.1f)), new Vector3f(0, 1, 0), orientation);
+                spawnRCSParticle(player, new Vector3f(0.35f, -0.3f, randSpread(0.1f)), new Vector3f(0, -1, 0), orientation);
             }
         }
-        if (mc.f_91066_.f_92087_.m_90857_()) {
+        if (ModKeyBindings.ROLL_RIGHT.isDown()) {
             for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), -0.3f), new Vector3f(0.0f, 0.0f, -1.0f), orientation);
-            }
-        }
-        if (mc.f_91066_.f_92086_.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(-0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(-1.0f, 0.0f, 0.0f), orientation);
-            }
-        }
-        if (mc.f_91066_.f_92088_.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(1.0f, 0.0f, 0.0f), orientation);
-            }
-        }
-        if (mc.f_91066_.f_92089_.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(randSpread(0.15f), -0.9f, randSpread(0.15f)), new Vector3f(0.0f, -1.0f, 0.0f), orientation);
-            }
-        }
-        if (mc.f_91066_.f_92090_.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(randSpread(0.15f), 0.9f, randSpread(0.15f)), new Vector3f(0.0f, 1.0f, 0.0f), orientation);
-            }
-        }
-        if (ModKeyBindings.ROLL_LEFT.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(-0.35f, 0.3f, randSpread(0.1f)), new Vector3f(0.0f, 1.0f, 0.0f), orientation);
-                spawnRCSParticle(player, new Vector3f(0.35f, -0.3f, randSpread(0.1f)), new Vector3f(0.0f, -1.0f, 0.0f), orientation);
-            }
-        }
-        if (ModKeyBindings.ROLL_RIGHT.m_90857_()) {
-            for (int i = 0; i < 2; i++) {
-                spawnRCSParticle(player, new Vector3f(0.35f, 0.3f, randSpread(0.1f)), new Vector3f(0.0f, 1.0f, 0.0f), orientation);
-                spawnRCSParticle(player, new Vector3f(-0.35f, -0.3f, randSpread(0.1f)), new Vector3f(0.0f, -1.0f, 0.0f), orientation);
+                spawnRCSParticle(player, new Vector3f(0.35f, 0.3f, randSpread(0.1f)), new Vector3f(0, 1, 0), orientation);
+                spawnRCSParticle(player, new Vector3f(-0.35f, -0.3f, randSpread(0.1f)), new Vector3f(0, -1, 0), orientation);
             }
         }
     }
@@ -122,25 +117,21 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-
-        Minecraft mc = Minecraft.m_91087_();
-        LocalPlayer player = mc.f_91074_;
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
         if (player == null) return;
 
         PlayerState localState = ZeroGMod.CLIENT_STATE;
-
         if (!localState.isZeroGEnabled) {
-            player.m_20242_(false);
+            player.setNoGravity(false);
             lastMouseX = Double.NaN;
             lastMouseY = Double.NaN;
             return;
         }
 
-        // 鼠标旋转
-        MouseHandler mouse = mc.m_91287_();
-        double mouseX = mouse.m_91516_();
-        double mouseY = mouse.m_91498_();
-
+        MouseHandler mouse = mc.mouseHandler;
+        double mouseX = mouse.xpos();
+        double mouseY = mouse.ypos();
         double rawDeltaX = 0.0, rawDeltaY = 0.0;
         if (!Double.isNaN(lastMouseX)) {
             rawDeltaX = mouseX - lastMouseX;
@@ -149,14 +140,13 @@ public class ClientEventHandler {
         lastMouseX = mouseX;
         lastMouseY = mouseY;
 
-        double sensitivity = mc.f_91064_.f_92080_().m_92135_();
+        double sensitivity = mc.options.sensitivity().get();
         double sensMultiplier = sensitivity * 0.6;
-
         double deltaX = rawDeltaX * sensMultiplier;
         double deltaY = rawDeltaY * sensMultiplier;
 
-        float newYaw = player.m_6084_() + (float) -deltaX;
-        float newPitch = player.m_6093_() + (float) deltaY;
+        float newYaw = player.getYRot() + (float) -deltaX;
+        float newPitch = player.getXRot() + (float) deltaY;
         newPitch = clamp(newPitch, -90.0f, 90.0f);
 
         Quaternionf qYaw = new Quaternionf().rotateY((float) Math.toRadians(-newYaw));
@@ -164,64 +154,54 @@ public class ClientEventHandler {
         localState.orientation = new Quaternionf(qYaw).mul(qPitch);
 
         float rollSpeed = 0.05f;
-        if (ModKeyBindings.ROLL_LEFT.m_90857_()) {
+        if (ModKeyBindings.ROLL_LEFT.isDown())
             localState.orientation.mul(new Quaternionf().rotateZ(-rollSpeed));
-        }
-        if (ModKeyBindings.ROLL_RIGHT.m_90857_()) {
+        if (ModKeyBindings.ROLL_RIGHT.isDown())
             localState.orientation.mul(new Quaternionf().rotateZ(rollSpeed));
-        }
         localState.orientation.normalize();
 
-        player.m_6842_(newYaw);
-        player.field_6280 = newYaw;
-        player.field_6300 = newYaw;
-        player.field_6301 = newYaw;
-        player.field_6302 = newYaw;
-        player.field_6303 = newYaw;
-        player.m_6841_(newPitch);
-        player.field_6281 = newPitch;
+        player.setYRot(newYaw);
+        player.yRotO = newYaw;
+        player.yBodyRot = newYaw;
+        player.yBodyRotO = newYaw;
+        player.yHeadRot = newYaw;
+        player.yHeadRotO = newYaw;
+        player.setXRot(newPitch);
+        player.xRotO = newPitch;
 
         handleRCSParticles(player, localState.orientation);
 
-        float forward = (mc.f_91064_.f_92080_.f_92090_.m_90857_() ? 1.0f : 0.0f) -
-                (mc.f_91064_.f_92080_.f_92095_.m_90857_() ? 1.0f : 0.0f);
-        float strafe = (mc.f_91064_.f_92080_.f_92091_.m_90857_() ? 1.0f : 0.0f) -
-                (mc.f_91064_.f_92080_.f_92094_.m_90857_() ? 1.0f : 0.0f);
-        float up = (mc.f_91064_.f_92080_.f_92092_.m_90857_() ? 1.0f : 0.0f) -
-                (mc.f_91064_.f_92080_.f_92096_.m_90857_() ? 1.0f : 0.0f);
-        boolean rollL = ModKeyBindings.ROLL_LEFT.m_90857_();
-        boolean rollR = ModKeyBindings.ROLL_RIGHT.m_90857_();
+        float forward = (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f);
+        float strafe = (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f);
+        float up = (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f);
+        boolean rollL = ModKeyBindings.ROLL_LEFT.isDown();
+        boolean rollR = ModKeyBindings.ROLL_RIGHT.isDown();
 
         ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(forward, strafe, up, rollL, rollR));
     }
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
-        if (ZeroGMod.CLIENT_STATE.isZeroGEnabled) {
-            Entity entity = event.getEntity();
-            if (entity.getClass().getName().contains("EntityKineticBullet")) {
-                try {
-                    Field gravityField = entity.getClass().getDeclaredField("gravity");
-                    gravityField.setAccessible(true);
-                    gravityField.setFloat(entity, 0.0f);
-                    Field frictionField = entity.getClass().getDeclaredField("friction");
-                    frictionField.setAccessible(true);
-                    frictionField.setFloat(entity, 0.0f);
-                } catch (IllegalAccessException | NoSuchFieldException e) {
-                }
-                Minecraft mc = Minecraft.m_91087_();
-                LocalPlayer player = mc.f_91074_;
-                if (player == null) {
-                    return;
-                }
-                Vec3 motion = entity.m_20184_();
-                double speed = motion.m_82553_();
-                if (speed < 0.001d) {
-                    speed = 3.0d;
-                }
-                Vec3 look = player.m_20154_().m_82541_().m_82490_(speed);
-                entity.m_20256_(look);
+        if (!ZeroGMod.CLIENT_STATE.isZeroGEnabled) return;
+        Entity entity = event.getEntity();
+        if (entity.getClass().getName().contains("EntityKineticBullet")) {
+            try {
+                Field gravityField = entity.getClass().getDeclaredField("gravity");
+                gravityField.setAccessible(true);
+                gravityField.setFloat(entity, 0.0f);
+                Field frictionField = entity.getClass().getDeclaredField("friction");
+                frictionField.setAccessible(true);
+                frictionField.setFloat(entity, 0.0f);
+            } catch (Exception ignored) {
             }
+            Minecraft mc = Minecraft.getInstance();
+            LocalPlayer player = mc.player;
+            if (player == null) return;
+            Vec3 motion = entity.getDeltaMovement();
+            double speed = motion.length();
+            if (speed < 0.001d) speed = 3.0d;
+            Vec3 look = player.getLookAngle().normalize().scale(speed);
+            entity.setDeltaMovement(look);
         }
     }
 
@@ -239,18 +219,17 @@ public class ClientEventHandler {
     public static void onPlayerRender(RenderPlayerEvent.Pre event) {
         PlayerState state = ZeroGMod.CLIENT_STATE;
         if (state.isZeroGEnabled) {
-            Minecraft mc = Minecraft.m_91087_();
-            LocalPlayer entity = (LocalPlayer) event.getEntity(); // 注意这里 event.getEntity() 返回
-                                                                  // Player，但上下文是 LocalPlayer
-            if (entity == mc.f_91074_ && !mc.f_91066_.m_92176_().m_90612_()) {
+            Minecraft mc = Minecraft.getInstance();
+            LocalPlayer entity = (LocalPlayer) event.getEntity();
+            if (entity == mc.player && !mc.player.getAbilities().instabuild) {
                 PoseStack poseStack = event.getPoseStack();
                 float partialTick = event.getPartialTick();
-                float halfHeight = entity.m_20206_() / 2.0f;
-                float interpolatedBodyYaw = Mth.m_14189_(partialTick, ((Player) entity).field_6301, ((Player) entity).field_6300);
-                poseStack.m_85836_();
-                poseStack.m_252880_(0.0f, halfHeight, 0.0f);
-                poseStack.m_252781_(Axis.f_252436_.m_252977_(interpolatedBodyYaw));
-                poseStack.m_252880_(0.0f, -halfHeight, 0.0f);
+                float halfHeight = entity.getBbHeight() / 2.0f;
+                float interpolatedBodyYaw = Mth.lerp(partialTick, entity.yBodyRotO, entity.yBodyRot);
+                poseStack.pushPose();
+                poseStack.translate(0.0f, halfHeight, 0.0f);
+                poseStack.mulPose(Axis.YP.rotationDegrees(interpolatedBodyYaw));
+                poseStack.translate(0.0f, -halfHeight, 0.0f);
             }
         }
     }
