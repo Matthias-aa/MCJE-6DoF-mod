@@ -72,27 +72,28 @@ public class ClientEventHandler {
 
     private static void handleRCSParticles(LocalPlayer player, Quaternionf orientation) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player.input.up.isDown()) {
+        // 注意：input 的 up/down/left/right/jump/shift 是 boolean 字段，直接判断
+        if (mc.player.input.up) {
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), 0.3f), new Vector3f(0, 0, 1), orientation);
         }
-        if (mc.player.input.down.isDown()) {
+        if (mc.player.input.down) {
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), -0.3f), new Vector3f(0, 0, -1), orientation);
         }
-        if (mc.player.input.left.isDown()) {
+        if (mc.player.input.left) {
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(-0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(-1, 0, 0), orientation);
         }
-        if (mc.player.input.right.isDown()) {
+        if (mc.player.input.right) {
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(0.35f, randSpread(0.1f), randSpread(0.1f)), new Vector3f(1, 0, 0), orientation);
         }
-        if (mc.player.input.jump.isDown()) {
+        if (mc.player.input.jumping) { // 注意：跳跃是 jumping 字段
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(randSpread(0.15f), -0.9f, randSpread(0.15f)), new Vector3f(0, -1, 0), orientation);
         }
-        if (mc.player.input.shift.isDown()) {
+        if (mc.player.input.shiftKeyDown) { // 潜行是 shiftKeyDown
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(randSpread(0.15f), 0.9f, randSpread(0.15f)), new Vector3f(0, 1, 0), orientation);
         }
