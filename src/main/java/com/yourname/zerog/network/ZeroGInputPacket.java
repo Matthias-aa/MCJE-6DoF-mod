@@ -31,9 +31,7 @@ public record ZeroGInputPacket(float forward, float strafe, float up,
                     state.inputForward = msg.forward;
                     state.inputStrafe = msg.strafe;
                     state.inputUp = msg.up;
-                    state.inputRollLeft = msg.rollLeft;
-                    state.inputRollRight = msg.rollRight;
-                    state.orientation.set(msg.orientation); // 同步四元数到服务端
+                    state.orientation.set(msg.orientation);
                     state.orientationInitialized = true;
                 });
             }
