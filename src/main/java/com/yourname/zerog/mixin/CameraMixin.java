@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin({Camera.class})
 /* loaded from: zerog-1.0.0.jar:com/yourname/zerog/mixin/CameraMixin.class */
 public abstract class CameraMixin {
-    @Inject(method = {"m_90575_"}, at = {@At("TAIL")})
+    @Inject(method = {"m_90575_"}, at = {@At("TAIL")}, remap = false)
     private void zerog$onSetup(BlockGetter level, Entity entity, boolean detached, boolean mirrored, float partialTick, CallbackInfo ci) {
     }
 }
