@@ -13,18 +13,19 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.PacketDistributor;
 import org.joml.Quaternionf;
 
 public class ZeroGCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
-            Commands.literal("zerog")
-                .executes(ctx -> toggle(ctx.getSource()))
-                .then(Commands.literal("on")
-                    .executes(ctx -> setState(ctx.getSource(), true)))
-                .then(Commands.literal("off")
-                    .executes(ctx -> setState(ctx.getSource(), false)))
+                Commands.literal("zerog")
+                        .executes(ctx -> toggle(ctx.getSource()))
+                        .then(Commands.literal("on")
+                                .executes(ctx -> setState(ctx.getSource(), true)))
+                        .then(Commands.literal("off")
+                                .executes(ctx -> setState(ctx.getSource(), false)))
         );
     }
 
@@ -62,6 +63,11 @@ public class ZeroGCommand {
                     s.orientationInitialized = false;
                 }
             });
+            // 关键：向客户端同步开关状态
+            ModNetwork.CHANNEL.send(
+                    PacketDistributor.PLAYER.with(() -> sp),
+                    new ZeroGTogglePacket(enable)
+            );
         }
 
         String status = enable ? "§a已开启" : "§c已关闭";
