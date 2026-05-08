@@ -10,16 +10,22 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(Player.class)
+@Mixin(Entity.class)
 public abstract class PlayerPositionMixin {
     private static final float HALF_HEIGHT = 0.9f;
 
     @Inject(method = "m_20191_", at = @At("RETURN"), cancellable = true)
     private void zerog$onMakeBoundingBox(CallbackInfoReturnable<AABB> cir) {
+        if (!(this instanceof Player player)) return; // 只处理玩家
+
         PlayerState state;
         AABB originalBox;
-        Player player = (Player) (Object) this;
-        if (player.level().isClientSide() && (state = ZeroGMod.CLIENT_STATE) != null && state.isZeroGEnabled && state.orientationInitialized && (originalBox = cir.getReturnValue()) != null) {
+        if (player.level().isClientSide() 
+            && (state = ZeroGMod.CLIENT_STATE) != null 
+            && state.isZeroGEnabled 
+            && state.orientationInitialized 
+            && (originalBox = cir.getReturnValue()) != null) {
+            
             Vector3f centerOffset = new Vector3f(0.0f, HALF_HEIGHT, 0.0f);
             state.orientation.transform(centerOffset);
             double offsetX = centerOffset.x;
