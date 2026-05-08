@@ -8,6 +8,7 @@ import com.yourname.zerog.network.ModNetwork;
 import com.yourname.zerog.network.ZeroGInputPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderPlayerEvent;
@@ -20,7 +21,7 @@ import org.joml.Vector3f;
 
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID, value = {Dist.CLIENT})
 public class ClientEventHandler {
-    
+
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
@@ -30,96 +31,77 @@ public class ClientEventHandler {
 
         PlayerState state = ZeroGMod.CLIENT_STATE;
 
-        // 1. 初始化朝向
+        // 1. 初始化
         if (!state.orientationInitialized) {
-            state.orientation = new Quaternionf()
-                .rotateY((float) Math.toRadians(-player.getYRot()))
-                .rotateX((float) Math.toRadians(player.getXRot()));
+            state.orientation = new Quaternionf().rotateY((float) Math.toRadians(-player.getYRot())).rotateX((float) Math.toRadians(player.getXRot()));
             state.orientationInitialized = true;
         }
 
-        // 2. 处理视角转动 (使用局部轴旋转，彻底解决“看向一处模型反了”的问题)
-        // 注意：这里的旋转必须是 rotateLocal，这样俯仰才永远是沿着你“眼睛”的水平线
-        double mouseX = mc.mouseHandler.xpos();
-        double mouseY = mc.mouseHandler.ypos();
-        
-        // 建议在外部记录上一次坐标计算差值 dx, dy
-        // 这里简化演示增量逻辑：
-        float sens = (float) (mc.options.sensitivity().get() * 0.12f);
-        // 假设已经获取了dx, dy (当前坐标 - 上次坐标)
-        // state.orientation.rotateLocalX(dy * sens);
-        // state.orientation.rotateLocalY(-dx * sens);
+        // 2. 视角转动 (修复锁死：使用内置 mouse.accumulated)
+        if (mc.screen == null) {
+            float sens = (float) (mc.options.sensitivity().get() * 0.15f);
+            double dx = mc.mouseHandler.xpos(); // 临时借用，但下面逻辑要改
+            // 修正：直接操作四元数
+            state.orientation.rotateLocalX((float) Math.toRadians(mc.mouseHandler.accumulatedDY * sens * -1));
+            state.orientation.rotateLocalY((float) Math.toRadians(mc.mouseHandler.accumulatedDX * sens * -1));
+        }
 
-        // 3. Roll 逻辑 (按 Q/E 绕局部 Z 轴旋转)
-        float rollSpeed = 0.05f;
-        if (ModKeyBindings.ROLL_LEFT.isDown()) state.orientation.rotateLocalZ(-rollSpeed);
-        if (ModKeyBindings.ROLL_RIGHT.isDown()) state.orientation.rotateLocalZ(rollSpeed);
-        
+        // 3. Roll
+        if (ModKeyBindings.ROLL_LEFT.isDown()) state.orientation.rotateLocalZ(-0.05f);
+        if (ModKeyBindings.ROLL_RIGHT.isDown()) state.orientation.rotateLocalZ(0.05f);
         state.orientation.normalize();
 
-        // 4. 同步给实体（解决模型反了的问题）
-        // 从四元数提取当前的看向量
-        Vector3f lookVec = new Vector3f(0, 0, 1);
-        state.orientation.transform(lookVec);
-        
-        float yaw = (float) Math.toDegrees(Math.atan2(-lookVec.x, lookVec.z));
-        float pitch = (float) Math.toDegrees(Math.asin(lookVec.y));
+        // 4. 输入状态
+        state.inputForward = (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f);
+        state.inputStrafe = (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f);
+        state.inputUp = (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f);
 
-        player.setYRot(yaw);
-        player.setXRot(pitch);
-        player.yBodyRot = yaw;
-        player.yHeadRot = yaw;
-        
-        // 发送数据到服务器
-        ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(
-            state.inputForward, state.inputStrafe, state.inputUp,
-            ModKeyBindings.ROLL_LEFT.isDown(), ModKeyBindings.ROLL_RIGHT.isDown(),
-            state.orientation // 必须发送四元数
-        ));
+        // 5. RCS 粒子修复 (确保在身体周围生成)
+        if (state.inputForward != 0 || state.inputStrafe != 0 || state.inputUp != 0) {
+            for(int i=0; i<2; i++) {
+                player.level().addParticle(ParticleTypes.FIREWORK, player.getX(), player.getY() + 1.0, player.getZ(), 
+                    (Math.random()-0.5)*0.1, (Math.random()-0.5)*0.1, (Math.random()-0.5)*0.1);
+            }
+        }
+
+        // 6. 同步模型朝向 (看向哪，模型朝哪)
+        Vector3f look = new Vector3f(0, 0, 1);
+        state.orientation.transform(look);
+        player.setYRot((float) Math.toDegrees(Math.atan2(-look.x, look.z)));
+        player.setXRot((float) Math.toDegrees(Math.asin(look.y)));
+
+        // 7. 发包
+        ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(state.inputForward, state.inputStrafe, state.inputUp, 
+                ModKeyBindings.ROLL_LEFT.isDown(), ModKeyBindings.ROLL_RIGHT.isDown(), state.orientation));
     }
 
     @SubscribeEvent
     public static void onCameraSetup(ViewportEvent.ComputeCameraAngles event) {
         PlayerState state = ZeroGMod.CLIENT_STATE;
         if (state.isZeroGEnabled && state.orientationInitialized) {
-            // 直接将四元数转为欧拉角给相机，防止翻转
-            Vector3f euler = new Vector3f();
-            state.orientation.getEulerAnglesXYZ(euler);
-            event.setPitch((float) Math.toDegrees(euler.x));
-            event.setYaw((float) Math.toDegrees(euler.y));
-            event.setRoll((float) Math.toDegrees(euler.z));
+            Vector3f angles = new Vector3f();
+            state.orientation.getEulerAnglesXYZ(angles);
+            event.setPitch((float) Math.toDegrees(angles.x));
+            event.setYaw((float) Math.toDegrees(angles.y));
+            event.setRoll((float) Math.toDegrees(angles.z));
         }
     }
 
     @SubscribeEvent
     public static void onPlayerRenderPre(RenderPlayerEvent.Pre event) {
         if (!ZeroGMod.CLIENT_STATE.isZeroGEnabled) return;
-        
         PoseStack stack = event.getPoseStack();
-        Player player = event.getEntity();
         stack.pushPose();
-
-        // 核心修复：以身体中心旋转
-        // 1.20.1 默认渲染点在脚底，所以要先向上平移一半身高
-        float pivot = player.getBbHeight() / 2.0f;
-        stack.translate(0, pivot, 0);
-        
-        // 使用四元数进行完整旋转
+        float h = event.getEntity().getBbHeight() / 2.0f;
+        stack.translate(0, h, 0);
         stack.mulPose(ZeroGMod.CLIENT_STATE.orientation);
-        
-        // 旋转后再平移回来
-        stack.translate(0, -pivot, 0);
-        
-        // 禁用默认的行走动画和头部摇晃，防止模型崩坏
-        player.walkAnimation.setSpeed(0);
+        stack.translate(0, -h, 0);
         event.getRenderer().getModel().head.xRot = 0;
         event.getRenderer().getModel().head.yRot = 0;
     }
 
     @SubscribeEvent
     public static void onPlayerRenderPost(RenderPlayerEvent.Post event) {
-        if (ZeroGMod.CLIENT_STATE.isZeroGEnabled) {
-            event.getPoseStack().popPose();
-        }
+        if (ZeroGMod.CLIENT_STATE.isZeroGEnabled) event.getPoseStack().popPose();
     }
 }
