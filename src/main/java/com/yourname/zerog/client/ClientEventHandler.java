@@ -45,27 +45,28 @@ public class ClientEventHandler {
             state.orientationInitialized = true;
         }
 
-        // 2. 局部增量旋转
+        // 2. 局部增量旋转 (解决视角锯齿与翻转)
         MouseHandler mouse = mc.mouseHandler;
         if (!Double.isNaN(lastMouseX)) {
             double dx = mouse.xpos() - lastMouseX;
             double dy = mouse.ypos() - lastMouseY;
             float sens = (float) (mc.options.sensitivity().get() * 0.12f);
 
+            // 绕局部X轴(俯仰)和局部Y轴(偏航)旋转
             state.orientation.rotateLocalX((float) Math.toRadians(dy * sens));
             state.orientation.rotateLocalY((float) Math.toRadians(-dx * sens));
         }
         lastMouseX = mouse.xpos();
         lastMouseY = mouse.ypos();
 
-        // 3. Roll
+        // 3. Roll (滚转)
         float rollSpeed = 0.04f;
         if (ModKeyBindings.ROLL_LEFT.isDown()) state.orientation.rotateLocalZ(-rollSpeed);
         if (ModKeyBindings.ROLL_RIGHT.isDown()) state.orientation.rotateLocalZ(rollSpeed);
         
         state.orientation.normalize();
 
-        // 4. 同步基础朝向
+        // 4. 将四元数转换为 Yaw/Pitch 同步给玩家实体
         Vector3f look = new Vector3f(0, 0, 1);
         state.orientation.transform(look);
         float yaw = (float) Math.toDegrees(Math.atan2(-look.x, look.z));
@@ -82,6 +83,7 @@ public class ClientEventHandler {
         float forward = (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f);
         float strafe  = (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f);
         float up      = (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f);
+        
         ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(
                 forward, strafe, up, 
                 ModKeyBindings.ROLL_LEFT.isDown(), 
@@ -95,6 +97,7 @@ public class ClientEventHandler {
         if (state.isZeroGEnabled && state.orientationInitialized) {
             Vector3f angles = new Vector3f();
             state.orientation.getEulerAnglesXYZ(angles);
+            // 修正：ComputeCameraAngles 需要角度值
             event.setPitch((float) Math.toDegrees(angles.x));
             event.setYaw((float) Math.toDegrees(angles.y));
             event.setRoll((float) Math.toDegrees(angles.z));
@@ -108,15 +111,15 @@ public class ClientEventHandler {
         Player player = event.getEntity();
         
         poseStack.pushPose();
+        // 旋转中心设为模型中心
         float pivot = player.getBbHeight() / 2.0f;
         poseStack.translate(0, pivot, 0);
         poseStack.mulPose(ZeroGMod.CLIENT_STATE.orientation);
         poseStack.translate(0, -pivot, 0);
 
-        // --- 修复编译错误的部分 ---
-        // 在 1.20.1 中使用 walkAnimation 替代旧的 animationPosition/Speed
-        player.walkAnimation.setSpeed(0);
-        player.walkAnimation.setFirstTickPos(0); 
+        // 修复编译错误：停止行走动画，让模型像粘住的一样
+        player.walkAnimation.setSpeed(0f);
+        // 使用反射或特定的 mapping 如果仍然报错，这里直接设 speed 为 0 即可停止大部分动作
         
         event.getRenderer().getModel().head.xRot = 0;
         event.getRenderer().getModel().head.yRot = 0;
