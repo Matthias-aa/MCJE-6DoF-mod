@@ -6,7 +6,8 @@
   "client": [
     "CameraMixin",
     "PlayerDimensionsMixin",
-    "PlayerPositionMixin"
+    "PlayerPositionMixin",
+    "MouseHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
