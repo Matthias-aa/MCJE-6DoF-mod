@@ -9,6 +9,7 @@ import com.yourname.zerog.network.ZeroGInputPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderPlayerEvent;
@@ -45,47 +46,48 @@ public class ClientEventHandler {
             state.orientationInitialized = true;
         }
 
-        // 2. 局部增量旋转 (解决视角锯齿与翻转)
+        // 2. 局部增量旋转 (解决视角随世界Y轴转动的问题)
         MouseHandler mouse = mc.mouseHandler;
         if (!Double.isNaN(lastMouseX)) {
             double dx = mouse.xpos() - lastMouseX;
             double dy = mouse.ypos() - lastMouseY;
             float sens = (float) (mc.options.sensitivity().get() * 0.12f);
 
-            // 绕局部X轴(俯仰)和局部Y轴(偏航)旋转
-            state.orientation.rotateLocalX((float) Math.toRadians(dy * sens));
+            // 修正：使用 rotateLocal。 
+            // 俯仰：绕局部 X 轴。dy为正则鼠标向下，我们要抬头，所以是负。
+            state.orientation.rotateLocalX((float) Math.toRadians(-dy * sens)); 
+            // 偏航：绕局部 Y 轴 (即玩家的"头顶"轴，不是世界的Y轴)
             state.orientation.rotateLocalY((float) Math.toRadians(-dx * sens));
         }
         lastMouseX = mouse.xpos();
         lastMouseY = mouse.ypos();
 
-        // 3. Roll (滚转)
-        float rollSpeed = 0.04f;
+        // 3. Roll (滚转) - 绕局部 Z 轴
+        float rollSpeed = 0.05f;
         if (ModKeyBindings.ROLL_LEFT.isDown()) state.orientation.rotateLocalZ(-rollSpeed);
         if (ModKeyBindings.ROLL_RIGHT.isDown()) state.orientation.rotateLocalZ(rollSpeed);
         
         state.orientation.normalize();
 
-        // 4. 将四元数转换为 Yaw/Pitch 同步给玩家实体
+        // 4. 同步实体数据 (用于维持引擎内部渲染逻辑)
         Vector3f look = new Vector3f(0, 0, 1);
         state.orientation.transform(look);
-        float yaw = (float) Math.toDegrees(Math.atan2(-look.x, look.z));
-        float pitch = (float) Math.toDegrees(Math.asin(look.y));
+        player.setYRot((float) Math.toDegrees(Math.atan2(-look.x, look.z)));
+        player.setXRot((float) Math.toDegrees(Math.asin(look.y)));
+        player.yBodyRot = player.getYRot();
+        player.yHeadRot = player.getYRot();
 
-        player.setYRot(yaw);
-        player.setXRot(pitch);
-        player.yBodyRot = yaw;
-        player.yHeadRot = yaw;
-        player.yHeadRotO = yaw;
-        player.yBodyRotO = yaw;
+        // 5. RCS 粒子效果 (确保粒子在喷口位置)
+        if (state.inputForward != 0 || state.inputStrafe != 0 || state.inputUp != 0) {
+            player.level().addParticle(ParticleTypes.END_ROD, 
+                player.getX(), player.getY() + 1.0, player.getZ(), 0, 0, 0);
+        }
 
-        // 5. 发送数据包
-        float forward = (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f);
-        float strafe  = (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f);
-        float up      = (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f);
-        
+        // 6. 发送 Packet
         ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(
-                forward, strafe, up, 
+                (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f),
+                (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f),
+                (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f),
                 ModKeyBindings.ROLL_LEFT.isDown(), 
                 ModKeyBindings.ROLL_RIGHT.isDown(), 
                 state.orientation));
@@ -97,7 +99,7 @@ public class ClientEventHandler {
         if (state.isZeroGEnabled && state.orientationInitialized) {
             Vector3f angles = new Vector3f();
             state.orientation.getEulerAnglesXYZ(angles);
-            // 修正：ComputeCameraAngles 需要角度值
+            // 注入计算好的欧拉角到相机
             event.setPitch((float) Math.toDegrees(angles.x));
             event.setYaw((float) Math.toDegrees(angles.y));
             event.setRoll((float) Math.toDegrees(angles.z));
@@ -111,16 +113,14 @@ public class ClientEventHandler {
         Player player = event.getEntity();
         
         poseStack.pushPose();
-        // 旋转中心设为模型中心
-        float pivot = player.getBbHeight() / 2.0f;
-        poseStack.translate(0, pivot, 0);
+        // 关键修复：以人物模型中心为中心旋转
+        float pivotY = player.getBbHeight() / 2.0f; // 约 0.9m
+        poseStack.translate(0, pivotY, 0);
         poseStack.mulPose(ZeroGMod.CLIENT_STATE.orientation);
-        poseStack.translate(0, -pivot, 0);
+        poseStack.translate(0, -pivotY, 0);
 
-        // 修复编译错误：停止行走动画，让模型像粘住的一样
+        // 像太空一样“粘住”：禁用所有肢体动画
         player.walkAnimation.setSpeed(0f);
-        // 使用反射或特定的 mapping 如果仍然报错，这里直接设 speed 为 0 即可停止大部分动作
-        
         event.getRenderer().getModel().head.xRot = 0;
         event.getRenderer().getModel().head.yRot = 0;
     }
