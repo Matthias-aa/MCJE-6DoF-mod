@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Player.class)
 public abstract class PlayerDimensionsMixin {
-    @Inject(method = "m_6972_", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getDimensions", at = @At("RETURN"), cancellable = true)
     private void zerog$onGetDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {
         PlayerState state;
         Player player = (Player) (Object) this;
