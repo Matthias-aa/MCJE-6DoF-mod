@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class PlayerPositionMixin {
     private static final float HALF_HEIGHT = 0.9f;
 
-    @Inject(method = "m_6089_", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "m_20191_", at = @At("RETURN"), cancellable = true)
     private void zerog$onMakeBoundingBox(CallbackInfoReturnable<AABB> cir) {
         PlayerState state;
         AABB originalBox;
