@@ -2,6 +2,7 @@ package com.yourname.zerog.mixin;
 
 import com.yourname.zerog.PlayerState;
 import com.yourname.zerog.ZeroGMod;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import org.joml.Vector3f;
