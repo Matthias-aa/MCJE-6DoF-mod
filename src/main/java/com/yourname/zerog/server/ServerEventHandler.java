@@ -12,8 +12,7 @@ import org.joml.Vector3f;
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID)
 public class ServerEventHandler {
     private static final double ACCEL = 0.08;
-    private static final double DRAG = 0.92;
-    private static final double MAX_SPEED = 1.4;
+    private static final double DRAG = 0.94;
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -22,7 +21,7 @@ public class ServerEventHandler {
             player.getCapability(ZeroGCapability.ZERO_G_STATE).ifPresent(state -> {
                 if (!state.isZeroGEnabled || !state.orientationInitialized) return;
 
-                // 1. 根据四元数计算方向向量
+                // 从四元数提取玩家当前的三个局部轴
                 Vector3f f = new Vector3f(0, 0, 1);
                 Vector3f r = new Vector3f(1, 0, 0);
                 Vector3f u = new Vector3f(0, 1, 0);
@@ -30,25 +29,14 @@ public class ServerEventHandler {
                 state.orientation.transform(r);
                 state.orientation.transform(u);
 
-                // 2. 移动加速度逻辑
-                Vec3 acc = new Vec3(0, 0, 0)
-                        .add(new Vec3(f.x, f.y, f.z).scale(state.inputForward * ACCEL))
+                // 计算推力
+                Vec3 force = new Vec3(f.x, f.y, f.z).scale(state.inputForward * ACCEL)
                         .add(new Vec3(r.x, r.y, r.z).scale(state.inputStrafe * ACCEL))
                         .add(new Vec3(u.x, u.y, u.z).scale(state.inputUp * ACCEL));
 
-                state.velocity = state.velocity.add(acc).scale(DRAG);
-                if (state.velocity.length() > MAX_SPEED) 
-                    state.velocity = state.velocity.normalize().scale(MAX_SPEED);
-
-                player.setDeltaMovement(state.velocity);
+                player.setDeltaMovement(player.getDeltaMovement().add(force).scale(DRAG));
                 player.setNoGravity(true);
-                player.hurtMarked = true;
-
-                // 同步渲染角度给其他玩家
-                Vector3f look = new Vector3f(0, 0, 1);
-                state.orientation.transform(look);
-                player.setYRot((float) Math.toDegrees(Math.atan2(-look.x, look.z)));
-                player.setXRot((float) Math.toDegrees(Math.asin(look.y)));
+                player.hurtMarked = true; // 强制同步
             });
         }
     }
