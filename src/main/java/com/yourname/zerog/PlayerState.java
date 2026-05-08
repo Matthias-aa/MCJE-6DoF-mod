@@ -1,37 +1,26 @@
 package com.yourname.zerog;
 
-import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
+import net.minecraft.world.phys.Vec3;
 
-/* loaded from: zerog-1.0.0.jar:com/yourname/zerog/PlayerState.class */
 public class PlayerState {
-    public Quaternionf orientation = new Quaternionf();
-    public Vec3 velocity = new Vec3(0.0d, 0.0d, 0.0d);
     public boolean isZeroGEnabled = false;
     public boolean orientationInitialized = false;
+    public Quaternionf orientation = new Quaternionf();
+    public Vec3 velocity = Vec3.ZERO;
 
-    public Vector3f getRotatedUp() {
-        Vector3f up = new Vector3f(0.0f, 1.0f, 0.0f);
-        this.orientation.transform(up);
-        return up;
-    }
-
-    public Vector3f getRotatedForward() {
-        Vector3f forward = new Vector3f(0.0f, 0.0f, 1.0f);
-        this.orientation.transform(forward);
-        return forward;
-    }
-
-    public Vector3f getRotatedRight() {
-        Vector3f right = new Vector3f(1.0f, 0.0f, 0.0f);
-        this.orientation.transform(right);
-        return right;
-    }
+    // 编译报错的关键：必须有这些字段
+    public float inputForward = 0;
+    public float inputStrafe = 0;
+    public float inputUp = 0;
 
     public void reset() {
-        this.orientation = new Quaternionf();
-        this.velocity = new Vec3(0.0d, 0.0d, 0.0d);
-        this.orientationInitialized = false;
+        isZeroGEnabled = false;
+        orientationInitialized = false;
+        orientation = new Quaternionf();
+        velocity = Vec3.ZERO;
+        inputForward = 0;
+        inputStrafe = 0;
+        inputUp = 0;
     }
 }
