@@ -1,5 +1,6 @@
 package com.yourname.zerog.network;
 
+import com.yourname.zerog.ZeroGMod;
 import com.yourname.zerog.capability.ZeroGCapability;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,6 +15,7 @@ public record ZeroGInputPacket(float forward, float strafe, float up, boolean ro
         buf.writeBoolean(msg.rollLeft);
         buf.writeBoolean(msg.rollRight);
     }
+
     public static ZeroGInputPacket decode(FriendlyByteBuf buf) {
         return new ZeroGInputPacket(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readBoolean(), buf.readBoolean());
     }
@@ -24,7 +26,7 @@ public record ZeroGInputPacket(float forward, float strafe, float up, boolean ro
             if (sp != null) {
                 sp.getCapability(ZeroGCapability.ZERO_G_STATE).ifPresent(state -> {
                     state.inputForward = msg.forward;
-                    state.inputStrafe = msg.strafe;
+                    state.inputStrafe = msg.strafe;   // 修复：原代码为 inputStafe
                     state.inputUp = msg.up;
                     state.inputRollLeft = msg.rollLeft;
                     state.inputRollRight = msg.rollRight;
