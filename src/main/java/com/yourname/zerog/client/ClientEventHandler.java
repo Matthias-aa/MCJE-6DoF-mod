@@ -5,13 +5,14 @@ import com.mojang.math.Axis;
 import com.yourname.zerog.ModKeyBindings;
 import com.yourname.zerog.PlayerState;
 import com.yourname.zerog.ZeroGMod;
-import com.yourname.zerog.network.ModNetwork;
-import com.yourname.zerog.network.ZeroGInputPacket;
+import java.lang.reflect.Field;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderPlayerEvent;
@@ -22,25 +23,26 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-
-import java.lang.reflect.Field;
+import com.yourname.zerog.network.ModNetwork;
+import com.yourname.zerog.network.ZeroGInputPacket;
 
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID, value = {Dist.CLIENT})
 public class ClientEventHandler {
+    private static double lastMouseX = Double.NaN;
+    private static double lastMouseY = Double.NaN;
 
-    // 辅助方法：从四元数提取欧拉角
     private static float extractYaw(Quaternionf q) {
-        float yaw = (float) Math.atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x));
+        float yaw = (float) Math.atan2(2.0f * ((q.w * q.y) + (q.x * q.z)), 1.0f - (2.0f * ((q.y * q.y) + (q.x * q.x))));
         return (float) Math.toDegrees(-yaw);
     }
 
     private static float extractPitch(Quaternionf q) {
-        float sinp = 2.0f * (q.w * q.x - q.z * q.y);
-        return (float) Math.toDegrees(Math.asin(clamp(sinp, -1.0f, 1.0f)));
+        float sinp = 2.0f * ((q.w * q.x) - (q.z * q.y));
+        return (float) Math.toDegrees((float) Math.asin(clamp(sinp, -1.0f, 1.0f)));
     }
 
     private static float extractRoll(Quaternionf q) {
-        float roll = (float) Math.atan2(2.0f * (q.w * q.z + q.x * q.y), 1.0f - 2.0f * (q.x * q.x + q.z * q.z));
+        float roll = (float) Math.atan2(2.0f * ((q.w * q.z) + (q.x * q.y)), 1.0f - (2.0f * ((q.x * q.x) + (q.z * q.z))));
         return (float) Math.toDegrees(roll);
     }
 
@@ -48,7 +50,6 @@ public class ClientEventHandler {
         return Math.max(min, Math.min(max, value));
     }
 
-    // RCS 粒子效果（根据当前方向和玩家输入）
     private static void spawnRCSParticle(LocalPlayer player, Vector3f localOffset, Vector3f localJetDir, Quaternionf orientation) {
         if (player.level() == null) return;
         Vector3f worldOffset = new Vector3f(localOffset);
@@ -69,7 +70,6 @@ public class ClientEventHandler {
 
     private static void handleRCSParticles(LocalPlayer player, Quaternionf orientation) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) return;
         if (mc.player.input.up) {
             for (int i = 0; i < 2; i++)
                 spawnRCSParticle(player, new Vector3f(randSpread(0.1f), randSpread(0.1f), 0.3f), new Vector3f(0, 0, 1), orientation);
@@ -112,7 +112,6 @@ public class ClientEventHandler {
         return ((float) (Math.random() - 0.5d)) * 2.0f * spread;
     }
 
-    // ========== 核心 Tick 逻辑：已修复视角平滑问题 ==========
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
@@ -123,17 +122,36 @@ public class ClientEventHandler {
         PlayerState localState = ZeroGMod.CLIENT_STATE;
         if (!localState.isZeroGEnabled) {
             player.setNoGravity(false);
+            lastMouseX = Double.NaN;
+            lastMouseY = Double.NaN;
             return;
         }
 
-        // 1. 直接使用原版已经平滑计算好的玩家朝向（完美保留鼠标灵敏度）
-        float yaw = player.getYRot();
-        float pitch = player.getXRot();
-        Quaternionf qYaw = new Quaternionf().rotateY((float) Math.toRadians(-yaw));
-        Quaternionf qPitch = new Quaternionf().rotateX((float) Math.toRadians(pitch));
-        localState.orientation = qYaw.mul(qPitch);
+        MouseHandler mouse = mc.mouseHandler;
+        double mouseX = mouse.xpos();
+        double mouseY = mouse.ypos();
+        double rawDeltaX = 0.0, rawDeltaY = 0.0;
+        if (!Double.isNaN(lastMouseX)) {
+            rawDeltaX = mouseX - lastMouseX;
+            rawDeltaY = mouseY - lastMouseY;
+        }
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
 
-        // 2. 叠加翻滚（由自定义按键控制）
+        // ★ 修改：灵敏度系数从 0.6 改为 1.0，与原版手感一致
+        double sensitivity = mc.options.sensitivity().get();
+        double sensMultiplier = sensitivity * 1.0;   // 原来是 * 0.6，太慢
+        double deltaX = rawDeltaX * sensMultiplier;
+        double deltaY = rawDeltaY * sensMultiplier;
+
+        float newYaw = player.getYRot() + (float) -deltaX;
+        float newPitch = player.getXRot() + (float) deltaY;
+        newPitch = clamp(newPitch, -90.0f, 90.0f);
+
+        Quaternionf qYaw = new Quaternionf().rotateY((float) Math.toRadians(-newYaw));
+        Quaternionf qPitch = new Quaternionf().rotateX((float) Math.toRadians(newPitch));
+        localState.orientation = new Quaternionf(qYaw).mul(qPitch);
+
         float rollSpeed = 0.05f;
         if (ModKeyBindings.ROLL_LEFT.isDown())
             localState.orientation.mul(new Quaternionf().rotateZ(-rollSpeed));
@@ -141,22 +159,30 @@ public class ClientEventHandler {
             localState.orientation.mul(new Quaternionf().rotateZ(rollSpeed));
         localState.orientation.normalize();
 
-        // 3. 标记朝向已初始化（碰撞箱适配需要）
+        // ★ 新增：标记朝向已初始化，用于碰撞箱适配
         localState.orientationInitialized = true;
 
-        // 4. 粒子效果
+        player.setYRot(newYaw);
+        player.yRotO = newYaw;
+        player.yBodyRot = newYaw;
+        player.yBodyRotO = newYaw;
+        player.yHeadRot = newYaw;
+        player.yHeadRotO = newYaw;
+        player.setXRot(newPitch);
+        player.xRotO = newPitch;
+
         handleRCSParticles(player, localState.orientation);
 
-        // 5. 发送输入给服务端（移动逻辑在服务端运行）
         float forward = (mc.options.keyUp.isDown() ? 1f : 0f) - (mc.options.keyDown.isDown() ? 1f : 0f);
         float strafe = (mc.options.keyLeft.isDown() ? 1f : 0f) - (mc.options.keyRight.isDown() ? 1f : 0f);
         float up = (mc.options.keyJump.isDown() ? 1f : 0f) - (mc.options.keyShift.isDown() ? 1f : 0f);
         boolean rollL = ModKeyBindings.ROLL_LEFT.isDown();
         boolean rollR = ModKeyBindings.ROLL_RIGHT.isDown();
+
         ModNetwork.CHANNEL.sendToServer(new ZeroGInputPacket(forward, strafe, up, rollL, rollR));
     }
 
-    // ========== 其他事件保持不变 ==========
+    // 以下四个事件监听器完全保留原始代码
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (!ZeroGMod.CLIENT_STATE.isZeroGEnabled) return;
@@ -169,7 +195,8 @@ public class ClientEventHandler {
                 Field frictionField = entity.getClass().getDeclaredField("friction");
                 frictionField.setAccessible(true);
                 frictionField.setFloat(entity, 0.0f);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             Minecraft mc = Minecraft.getInstance();
             LocalPlayer player = mc.player;
             if (player == null) return;
