@@ -17,7 +17,8 @@ public abstract class PlayerPositionMixin {
 
     @Inject(method = "m_20191_", at = @At("RETURN"), cancellable = true, remap = false)
     private void zerog$onMakeBoundingBox(CallbackInfoReturnable<AABB> cir) {
-        if (!(this instanceof Player player)) return;
+        // 需要 (Object) 强转，因为源码中 this 不是 Entity 的子类
+        if (!((Object) this instanceof Player player)) return;
 
         PlayerState state;
         AABB originalBox;
@@ -26,7 +27,7 @@ public abstract class PlayerPositionMixin {
             && state.isZeroGEnabled
             && state.orientationInitialized
             && (originalBox = cir.getReturnValue()) != null) {
-            
+
             Vector3f centerOffset = new Vector3f(0.0f, HALF_HEIGHT, 0.0f);
             state.orientation.transform(centerOffset);
             double offsetX = centerOffset.x;
