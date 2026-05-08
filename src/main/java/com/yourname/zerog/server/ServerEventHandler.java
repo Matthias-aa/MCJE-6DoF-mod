@@ -13,7 +13,6 @@ import com.yourname.zerog.ZeroGMod;
 @Mod.EventBusSubscriber(modid = ZeroGMod.MOD_ID)
 public class ServerEventHandler {
     private static final float ROLL_SPEED = 0.05f;
-    // 调整参数让移动更灵敏
     private static final double ACCEL = 0.08;
     private static final double DRAG = 0.92;
     private static final double MAX_SPEED = 1.4;
@@ -25,7 +24,7 @@ public class ServerEventHandler {
             player.getCapability(ZeroGCapability.ZERO_G_STATE).ifPresent(state -> {
                 if (!state.isZeroGEnabled) return;
 
-                // 初次激活时，用玩家当前视角初始化朝向
+                // 首次激活时从玩家当前朝向初始化
                 if (!state.orientationInitialized) {
                     float yaw = player.getYRot();
                     float pitch = player.getXRot();
@@ -35,35 +34,36 @@ public class ServerEventHandler {
                     state.orientationInitialized = true;
                 }
 
-                // 处理翻滚输入
+                // 持续翻滚（客户端每帧发，这里每服务端 tick 执行）
                 if (state.inputRollLeft)
                     state.orientation.mul(new Quaternionf().rotateZ(-ROLL_SPEED));
                 if (state.inputRollRight)
                     state.orientation.mul(new Quaternionf().rotateZ(ROLL_SPEED));
                 state.orientation.normalize();
 
-                // 将朝向回写给玩家实体（用于网络同步基础姿态）
-                float extractedYaw = extractYaw(state.orientation);
-                float extractedPitch = extractPitch(state.orientation);
-                player.setYRot(extractedYaw);
-                player.setXRot(extractedPitch);
-                player.yBodyRot = extractedYaw;
-                player.yHeadRot = extractedYaw;
-                player.setYBodyRot(extractedYaw);
-                player.setYHeadRot(extractedYaw);
+                // 同步玩家基础朝向（其他玩家可见的 yaw/pitch）
+                float yaw = (float) Math.toDegrees(Math.atan2(
+                        2.0 * (state.orientation.w * state.orientation.y + state.orientation.x * state.orientation.z),
+                        1.0 - 2.0 * (state.orientation.y * state.orientation.y + state.orientation.x * state.orientation.x))) * -1;
+                float pitch = (float) Math.toDegrees(Math.asin(
+                        Math.max(-1.0, Math.min(1.0, 2.0 * (state.orientation.w * state.orientation.x - state.orientation.z * state.orientation.y)))));
+                player.setYRot(yaw);
+                player.setXRot(pitch);
+                player.yBodyRot = yaw;
+                player.yHeadRot = yaw;   // 头部不晃动
 
-                // 计算自身坐标系的方向向量
-                Vector3f f3 = new Vector3f(0, 0, 1);
-                Vector3f u3 = new Vector3f(0, 1, 0);
-                Vector3f r3 = new Vector3f(1, 0, 0);
-                state.orientation.transform(f3);
-                state.orientation.transform(u3);
-                state.orientation.transform(r3);
-                Vec3 forward = new Vec3(f3.x, f3.y, f3.z).normalize();
-                Vec3 up = new Vec3(u3.x, u3.y, u3.z).normalize();
-                Vec3 right = new Vec3(r3.x, r3.y, r3.z).normalize();
+                // 自身坐标系方向
+                Vector3f f = new Vector3f(0, 0, 1);
+                Vector3f u = new Vector3f(0, 1, 0);
+                Vector3f r = new Vector3f(1, 0, 0);
+                state.orientation.transform(f);
+                state.orientation.transform(u);
+                state.orientation.transform(r);
+                Vec3 forward = new Vec3(f.x, f.y, f.z).normalize();
+                Vec3 up      = new Vec3(u.x, u.y, u.z).normalize();
+                Vec3 right   = new Vec3(r.x, r.y, r.z).normalize();
 
-                // 加速度 = 输入 * 朝向分量
+                // 移动加速度
                 Vec3 acc = Vec3.ZERO;
                 acc = acc.add(forward.scale(state.inputForward * ACCEL));
                 acc = acc.add(right.scale(state.inputStrafe * ACCEL));
@@ -78,20 +78,8 @@ public class ServerEventHandler {
                 player.setDeltaMovement(state.velocity);
                 player.setNoGravity(true);
                 player.hurtMarked = true;
-
-                // ★ 删除原来清零输入的代码，避免网络问题
+                // 注意：不再清零输入（客户端每帧发，保持连续翻滚）
             });
         }
-    }
-
-    private static float extractYaw(Quaternionf q) {
-        float yaw = (float) Math.atan2(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x));
-        return (float) Math.toDegrees(-yaw);
-    }
-
-    private static float extractPitch(Quaternionf q) {
-        float sinp = 2.0f * (q.w * q.x - q.z * q.y);
-        sinp = Math.max(-1, Math.min(1, sinp));
-        return (float) Math.toDegrees(Math.asin(sinp));
     }
 }
