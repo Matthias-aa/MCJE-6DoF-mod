@@ -14,16 +14,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class PlayerPositionMixin {
     private static final float HALF_HEIGHT = 0.9f;
 
-    @Inject(method = "m_20191_", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "m_20191_", at = @At("RETURN"), cancellable = true, remap = false)
     private void zerog$onMakeBoundingBox(CallbackInfoReturnable<AABB> cir) {
-        if (!(this instanceof Player player)) return; // 只处理玩家
+        if (!(this instanceof Player player)) return;
 
         PlayerState state;
         AABB originalBox;
-        if (player.level().isClientSide() 
-            && (state = ZeroGMod.CLIENT_STATE) != null 
-            && state.isZeroGEnabled 
-            && state.orientationInitialized 
+        if (player.level().isClientSide()
+            && (state = ZeroGMod.CLIENT_STATE) != null
+            && state.isZeroGEnabled
+            && state.orientationInitialized
             && (originalBox = cir.getReturnValue()) != null) {
             
             Vector3f centerOffset = new Vector3f(0.0f, HALF_HEIGHT, 0.0f);
