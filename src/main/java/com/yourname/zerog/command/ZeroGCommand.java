@@ -29,12 +29,47 @@ public class ZeroGCommand {
     private static int toggle(CommandSourceStack source) {
         Entity entity = source.getEntity();
         if (!(entity instanceof Player player)) return 0;
-        boolean current = player.level().isClientSide()
-            ? ZeroGMod.CLIENT_STATE.isZeroGEnabled
-            : player.getCapability(ZeroGCapability.ZERO_G_STATE).map(s -> s.isZeroGEnabled).orElse(false);
+
+        boolean current;
+        if (player.level().isClientSide()) {
+            current = ZeroGMod.CLIENT_STATE.isZeroGEnabled;
+        } else {
+            current = player.getCapability(ZeroGCapability.ZERO_G_STATE)
+                    .map(s -> s.isZeroGEnabled).orElse(false);
+        }
         return setState(source, !current);
     }
 
+    private static int setState(CommandSourceStack source, boolean enable) {
+        Entity entity = source.getEntity();
+        if (!(entity instanceof Player player)) return 0;
+
+        if (player.level().isClientSide()) {
+            // 本地状态立即生效
+            PlayerState state = ZeroGMod.CLIENT_STATE;
+            state.isZeroGEnabled = enable;
+            if (!enable) state.reset();
+
+            // 通知服务端（单人内建服务器 / 远程服务器均由此包触发）
+            ModNetwork.CHANNEL.sendToServer(new ZeroGTogglePacket(enable));
+        } else {
+            // 服务端直接执行
+            ServerPlayer sp = (ServerPlayer) player;
+            sp.getCapability(ZeroGCapability.ZERO_G_STATE).ifPresent(s -> {
+                s.isZeroGEnabled = enable;
+                if (!enable) {
+                    s.velocity = Vec3.ZERO;
+                    s.orientation = new Quaternionf();
+                    s.orientationInitialized = false;
+                }
+            });
+        }
+
+        String status = enable ? "§a已开启" : "§c已关闭";
+        source.sendSuccess(() -> Component.literal("§6[ZeroG] §f零重力模式 " + status), false);
+        return 1;
+    }
+}
     private static int setState(CommandSourceStack source, boolean enable) {
         Entity entity = source.getEntity();
         if (!(entity instanceof Player player)) return 0;
