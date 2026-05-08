@@ -19,8 +19,7 @@ public class ServerEventHandler {
                 if (!state.isZeroGEnabled) return;
 
                 player.setNoGravity(true);
-
-                // 根据同步过来的四元数计算局部轴
+                
                 Vector3f f = new Vector3f(0, 0, 1);
                 Vector3f r = new Vector3f(1, 0, 0);
                 Vector3f u = new Vector3f(0, 1, 0);
@@ -28,10 +27,10 @@ public class ServerEventHandler {
                 state.orientation.transform(r);
                 state.orientation.transform(u);
 
-                double speed = 0.12; // 提高基础速度
-                Vec3 move = new Vec3(f.x, f.y, f.z).scale(state.inputForward * speed)
-                        .add(new Vec3(r.x, r.y, r.z).scale(state.inputStrafe * speed))
-                        .add(new Vec3(u.x, u.y, u.z).scale(state.inputUp * speed));
+                double s = 0.12;
+                Vec3 move = new Vec3(f.x, f.y, f.z).scale(state.inputForward * s)
+                        .add(new Vec3(r.x, r.y, r.z).scale(state.inputStrafe * s))
+                        .add(new Vec3(u.x, u.y, u.z).scale(state.inputUp * s));
 
                 player.setDeltaMovement(player.getDeltaMovement().add(move).scale(0.95));
                 player.hurtMarked = true;
